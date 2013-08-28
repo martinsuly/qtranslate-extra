@@ -1,0 +1,16 @@
+.qte-pages
+{
+  margin-left: 10px;
+}
+
+.qte-pages label.qte-menu
+{
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.qte-pages ul
+{
+  margin-top: 4px;
+  margin-left: 13px;
+}

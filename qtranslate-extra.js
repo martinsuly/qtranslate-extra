@@ -10,7 +10,8 @@
         inputs: null,
         texts: null,
         current_language: 'en',
-        default_language: 'en'
+        default_language: 'en',
+        tag_type: 0
       }, options);
 
       if (typeof this.options.langs !== 'object')
@@ -61,59 +62,50 @@
       }
 
 
+      this.filterPatterns = [
+        '\\[:(.[^\\]]*)\\]((.|\\s)*?)\\[:.[^\\]]*\\]',
+        '<!--:(.[^-]*)-->((.|\\s)*?)<!--:-->',
+        '&lt;!--:(.[^-]*)--&gt;((.|\\s)*?)&lt;!--:--&gt;'
+      ];
+
       this.filterLanguages = function(text)
       {
         var l = {};
         var ll = {};
-        var a = true;
 
-        function replace()
+        for(var i in this.filterPatterns)
         {
-          l[a[1]] = a[2];
-          ll[a[1]] = a[0];
-          text = text.replace(a[0], '');
-        }
-
-        while(a)
-        {
-          a = /\[\:(.[^\]]*)\](.*?)\[\:.[^\]]*\]/gi.exec(text);
-          if (a) replace();
-        }
-
-        // try another type of language definition
-        if (Object.keys(l).length == 0)
-        {
-          a = true;
+          var a = true;
           while(a)
           {
-            a = /<!--:(.[^-]*)-->(.*?)<!--:-->/gi.exec(text);
-            if (a) replace();
+            var p = new RegExp(this.filterPatterns[i], 'mgi');
+            a = p.exec(text);
+            if (a)
+            {
+              l[a[1]] = a[2];
+              ll[a[1]] = a[0];
+              text = text.replace(a[0], '');
+            }
           }
-        }
 
-        // what if are these elements escaped
-        if (Object.keys(l).length == 0)
-        {
-          a = true;
-          while(a)
-          {
-            a = /&lt;!--:(.[^-]*)--&gt;(.*?)&lt;!--:--&gt;/gi.exec(text);
-            if (a) replace();
-          }
+          if (Object.keys(l).length > 0)
+            break;
         }
-
 
         return {
           'langs': l,
           'langs_fragments': ll
         };
+
       }
+
 
       this.translatableInput = function()
       {
         var $t = $(this);
 
-        if ($t.hasClass('qTranslateExtra'))
+        if ($t.hasClass('qTranslateExtra') || $t.attr('readonly') || $t.attr('disabled') ||
+          $t.hasClass('wp-editor-area'))
           return;
 
         $t.addClass('qTranslateExtra')
@@ -121,8 +113,9 @@
         var $clone = $t.clone();
         var langs = parent.filterLanguages($t.val()).langs;
         var current_lang = parent.options.current_language;
+        var t_width = $t.width();
+        var t_height = $t.height();
 
-        //$t.attr('type', 'hidden');
         $t.css('display', 'none');
 
         // create language selector
@@ -130,12 +123,28 @@
           'position': 'absolute',
           'border': '#999999 1px solid',
           'background-color': '#ffffff',
-          'padding': '5px 0px',
-          'height': '12px',
+          'padding': '3px 0px',
+          'height': '16px',
           'display': 'none',
           'cursor': 'pointer',
-          'z-index': '999'
+          'z-index': '999',
+          'line-height': '0px'
         });
+
+        var select_language = function()
+        {
+          $selector.find('img').css({
+            'border-color': '#ffffff',
+            'opacity': 0.3
+          });
+
+          $selector.find('img[data-lang=' + current_lang + ']').css('border-color', '#aaaaaa');
+
+          for(var iso_code in langs)
+            if (langs.hasOwnProperty(iso_code) && langs[iso_code].length > 0)
+              $selector.find('img[data-lang=' + iso_code + ']').css('opacity', 1);
+        }
+
 
         if (Object.keys(langs).length == 0)
           langs[parent.options.default_language] = $t.val();
@@ -150,75 +159,103 @@
               'src': parent.options.langs[iso_code],
               'data-lang': iso_code
             }).css({
-              'margin-left': '3px',
-              'margin-right': '3px'
+              'margin-left': '1px',
+              'margin-right': '1px',
+              'border': '#ffffff 1px solid',
+              'padding': '1px'
             });
 
           // change language
           $img.on('click', function(e)
           {
             var $i = $(this);
-            $selector.hide();
             current_lang = $i.attr('data-lang');
-            $selector_button.find('img').attr('src', $i.attr('src'));
             $clone.val(langs[current_lang]);
+            select_language();
           });
 
           $selector.append($img);
         }
 
-        var $selector_button = $('<div></div>');
-        $selector_button.css({
-          'cursor': 'pointer',
-          'margin-top': '5px',
-          'width': '18px',
-          'height': '15px',
-          'z-index': '999'
-        });
+        select_language();
 
-        $selector_button.append($('<img />').css('z-index', '999').attr('src', parent.options.langs[parent.options.current_language]));
-
-        $selector_button.on('click', function(e)
+        $selector.on('click', function()
         {
-          e.preventDefault();
-          $selector.toggle();
-          return false;
+          $clone.focus();
         });
-
-        $(document).on('click', function()
-        {
-          $selector.hide();
-        });
-
 
         // generate language string on change
         $clone.on('change', function()
         {
           langs[current_lang] = $(this).val();
 
-          var lang_string = [];
+          var lang_string = '';
           var num = 0;
           for(var iso_code in langs)
             if (langs.hasOwnProperty(iso_code) && typeof langs[iso_code] === 'string' && langs[iso_code].length > 0)
             {
-              lang_string += '[:' + iso_code + ']' + langs[iso_code] + '[:' + iso_code +']';
+              if (parent.options.tag_type == 0)
+                lang_string += '[:' + iso_code + ']' + langs[iso_code] + '[:' + iso_code +']';
+              else
+                lang_string += '<!--:' + iso_code + '-->' + langs[iso_code] + '<!--:-->';
               num++;
             }
 
           if (num == 1)
           {
-            var lang_tag = '[:' + parent.options.default_language + ']';
-            if (lang_string.indexOf(lang_tag) != -1)
-              lang_string = lang_string.replace(lang_tag, '').replace(lang_tag, '');
+            if (parent.options.tag_type == 0)
+            {
+              var lang_tag = '[:' + parent.options.default_language + ']';
+              if (lang_string.indexOf(lang_tag) != -1)
+                lang_string = lang_string.replace(lang_tag, '').replace(lang_tag, '');
+            }
+            else
+            {
+              var lang_tag = '<!--:' + parent.options.default_language + '-->';
+              if (lang_string.indexOf(lang_tag) != -1)
+                lang_string = lang_string.replace(lang_tag, '').replace('<!--:-->', '');
+            }
           }
 
           $t.val(lang_string);
         });
 
 
+        $clone.on('focusin', function()
+        {
+          if ($selector.is(':visible'))
+            return;
+
+          var $t = $(this);
+          var off = $t.offset();
+
+          $selector.css({
+            'top': (off.top + $t.outerHeight() + 2) + 'px',
+            'left': (off.left) + 'px'
+          });
+
+          $selector.show();
+        });
+
+
+        $clone.on('focusout', function()
+        {
+          var $t = $(this);
+          window.setTimeout(function()
+          {
+            if ($t.is(':focus'))
+              return;
+
+            $selector.hide();
+            current_lang = parent.options.current_language;
+            $clone.val(langs[current_lang]);
+            select_language();
+          }, 200);
+        });
+
         $clone.attr('id', '').attr('name', '').attr('value', langs[current_lang]).insertAfter($t);
-        $selector_button.appendTo($t.parent());
-        $selector.appendTo($t.parent());
+
+        $selector.appendTo('body');
       }
 
       this.filterText = function()

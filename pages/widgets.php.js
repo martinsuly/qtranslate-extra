@@ -4,7 +4,12 @@ jQuery(document).ready(function($)
   {
     $.qTranslate({
       langs: QTranslateExtra.langs,
-      inputs: $('#widgets-right input[type=text], .inactive-sidebar input[type=text]'),
+      inputs: [
+        '#widgets-right input[type=text]',
+        '.inactive-sidebar input[type=text]',
+        '#widgets-right textarea',
+        '.inactive-sidebar textarea'
+      ],
       texts: '#widgets-right .in-widget-title, .inactive-sidebar .in-widget-title',
       current_language: QTranslateExtra.current_language,
       default_language: QTranslateExtra.default_language

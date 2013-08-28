@@ -4,10 +4,10 @@ jQuery(document).ready(function($)
   {
     $.qTranslate({
       langs: QTranslateExtra.langs,
-      inputs: ['#title', '#content'],
-      texts: '',
+      inputs: ['#dashboard_quick_press input[name=post_title]', '#dashboard_quick_press #content'],
       current_language: QTranslateExtra.current_language,
-      default_language: QTranslateExtra.default_language
+      default_language: QTranslateExtra.default_language,
+      tag_type: 1
     });
   }
 
