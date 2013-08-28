@@ -70,8 +70,13 @@ class QTranslateExtra
 
       add_filter('wp_setup_nav_menu_item', array($this, 'wp_setup_nav_menu_item'));
 
+
+      $options = get_option(__class__.'_options', array());
+      if (!is_array($options)) $options = array();
+
       // global handler to replace content by language
-      add_action('init', array($this, 'init_lang_replace'), 0);
+      if (isset($options['filter_all']) && $options['filter_all'])
+        add_action('init', array($this, 'init_lang_replace'), 0);
     }
 
     // on activation/uninstallation hooks
