@@ -17,8 +17,6 @@ some description
 
 == Screenshots ==
 
-1. **Real-time Community** - Engage with everyone on your site, paste pictures/videos/music directly into the chat!
-
 
 == Changelog ==
 
