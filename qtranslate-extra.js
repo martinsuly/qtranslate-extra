@@ -1,5 +1,16 @@
 (function($)
 {
+  /*
+  var old_clone = $.fn.clone;
+
+  $.fn.clone = function()
+  {
+    this.find('.qTranslateExtra').trigger('click');
+
+    return old_clone.apply(this, arguments);
+  }
+  */
+
   $.extend({
     qTranslate: function(options)
     {
@@ -111,12 +122,13 @@
         $t.addClass('qTranslateExtra')
 
         var $clone = $t.clone();
-        var langs = parent.filterLanguages($t.val()).langs;
+        var langs;
         var current_lang = parent.options.current_language;
         var t_width = $t.width();
         var t_height = $t.height();
 
         $t.css('display', 'none');
+        //$t.attr('type', 'hidden');
 
         // create language selector
         var $selector = $('<span></span>').css({
@@ -145,16 +157,23 @@
               $selector.find('img[data-lang=' + iso_code + ']').css('opacity', 1);
         }
 
+        var fill_langs = function()
+        {
+          langs = parent.filterLanguages($t.val()).langs;
 
-        if (Object.keys(langs).length == 0)
-          langs[parent.options.default_language] = $t.val();
+          if (Object.keys(langs).length == 0)
+            langs[parent.options.default_language] = $t.val();
 
-        // fill buffer
+          for(var iso_code in parent.options.langs)
+            if (!langs.hasOwnProperty(iso_code))
+              langs[iso_code] = '';
+
+          $clone.val(langs[current_lang]);
+        }
+
+        // create flags
         for(var iso_code in parent.options.langs)
         {
-          if (!langs.hasOwnProperty(iso_code))
-            langs[iso_code] = '';
-
           var $img = $('<img />').attr({
               'src': parent.options.langs[iso_code],
               'data-lang': iso_code
@@ -168,20 +187,24 @@
           // change language
           $img.on('click', function(e)
           {
+            e.preventDefault();
+            $clone.focus();
+
             var $i = $(this);
             current_lang = $i.attr('data-lang');
             $clone.val(langs[current_lang]);
             select_language();
+            return false;
           });
 
           $selector.append($img);
         }
 
-        select_language();
-
-        $selector.on('click', function()
+        $selector.on('click', function(e)
         {
+          e.preventDefault();
           $clone.focus();
+          return false;
         });
 
         // generate language string on change
@@ -220,20 +243,31 @@
           $t.val(lang_string);
         });
 
+        $clone.on('click', function(e)
+        {
+          e.preventDefault();
+          return false;
+        });
 
         $clone.on('focusin', function()
         {
           if ($selector.is(':visible'))
             return;
 
-          var $t = $(this);
-          var off = $t.offset();
+          $clone = $(this);
+          $t = $clone.prev();
+
+          fill_langs();
+
+          var $ts = $(this);
+          var off = $ts.offset();
 
           $selector.css({
-            'top': (off.top + $t.outerHeight() + 2) + 'px',
+            'top': (off.top + $ts.outerHeight() + 2) + 'px',
             'left': (off.left) + 'px'
           });
 
+          select_language();
           $selector.show();
         });
 
@@ -248,15 +282,20 @@
 
             $selector.hide();
             current_lang = parent.options.current_language;
-            $clone.val(langs[current_lang]);
+            $t.val(langs[current_lang]);
             select_language();
           }, 200);
         });
 
-        $clone.attr('id', '').attr('name', '').attr('value', langs[current_lang]).insertAfter($t);
+        fill_langs();
 
+        $t.attr('id', '');
+        $clone.attr('name', '').insertAfter($t);
         $selector.appendTo('body');
       }
+
+
+
 
       this.filterText = function()
       {

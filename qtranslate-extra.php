@@ -4,10 +4,10 @@ Plugin Name: qTranslate Extra
 Plugin URI: http://www.example.com
 Description: qTranslate Extra adds ability to translate Widgets, Menus and more...
 Author: Martin Sudolsky
-Version: 0.0.2
+Version: 0.0.4
 Author URI: http://martinsuly.eu
 Text Domain: qtranslate-extra
-License: GPLv2
+License: GPLv2 or later
 */
 
 if (!defined('ABSPATH')) die();
@@ -15,18 +15,21 @@ if (!defined('ABSPATH')) die();
 class QTranslateExtra
 {
   const ld = 'qtranslate-extra';
-  const version = '0.0.2';
+  const version = '0.0.4';
   const nonce = 'qtranslate-extra-nonce';
 
   protected $_url, $_path, $_flags_path, $_site_url, $_qInstalled;
 
   protected $supported_pages = array(
-    'index.php',
-    'widgets.php',
-    'nav-menus.php',
-    'post.php',
-    'post-new.php',
-    'options-general.php'
+    'index.php' => 'index.php.js',
+    'widgets.php' => 'widgets.php.js',
+    'nav-menus.php' => 'nav-menus.php.js',
+    'post.php' => 'post.php.js',
+    'post-new.php' => 'post.php.js',
+    'post.php?post_type=page' => 'post.php.js',
+    'post-new.php?post_type=page' => 'post.php.js',
+    'options-general.php' => 'options-general.php.js',
+    'woocommerce_page_woocommerce_settings' => 'woocommerce_page_woocommerce_settings.js'
   );
 
   public function __construct()
@@ -65,11 +68,13 @@ class QTranslateExtra
     {
       $this->_site_url = get_site_url();
 
+      // append lang parameter to admin URL for AJAX requests
+      add_filter('admin_url', array($this, 'admin_url'));
+
       // should convert also archive links
       add_filter('post_type_archive_link', 'qtrans_convertURL');
 
       add_filter('wp_setup_nav_menu_item', array($this, 'wp_setup_nav_menu_item'));
-
 
       $options = get_option(__class__.'_options', array());
       if (!is_array($options)) $options = array();
@@ -78,6 +83,21 @@ class QTranslateExtra
       if (isset($options['filter_all']) && $options['filter_all'])
         add_action('init', array($this, 'init_lang_replace'), 0);
     }
+
+    // woocommerce support
+    add_filter('woocommerce_get_checkout_url', 'qtrans_convertURL');
+    add_filter('woocommerce_add_to_cart_url', 'qtrans_convertURL');
+    add_filter('woocommerce_get_cancel_order_url', 'qtrans_convertURL');
+    add_filter('woocommerce_get_cart_url', 'qtrans_convertURL');
+    add_filter('woocommerce_get_checkout_payment_url', 'qtrans_convertURL');
+    add_filter('woocommerce_get_remove_url', 'qtrans_convertURL');
+    add_filter('woocommerce_get_return_url', 'qtrans_convertURL');
+    add_filter('woocommerce_breadcrumb_home_url', 'qtrans_convertURL');
+    add_filter('woocommerce_gateway_title', 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
+    add_filter('woocommerce_gateway_description', 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
+    add_filter('woocommerce_shipping_method_title', 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
+    add_filter('woocommerce_email_footer_text', 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
+
 
     // on activation/uninstallation hooks
     register_activation_hook(__FILE__, array($this, 'activation'));
@@ -104,7 +124,7 @@ class QTranslateExtra
   // on activation
   public function activation()
   {
-    add_option(__class__.'_enabled_pages', $this->supported_pages);
+    add_option(__class__.'_enabled_pages', array_keys($this->supported_pages));
     add_option(__class__.'_options', array());
   }
 
@@ -179,6 +199,12 @@ class QTranslateExtra
     ob_start(array($this, 'callback_lang_replace'));
   }
 
+  public function admin_url($url)
+  {
+    global $q_config;
+    $url = add_query_arg(array('lang' => $q_config['language']), $url);
+    return $url;
+  }
 
   public function wp_setup_nav_menu_item($menu_item)
   {
@@ -209,14 +235,37 @@ class QTranslateExtra
     if ($hook == 'settings_page_QTranslateExtra')
       wp_enqueue_style(__class__.'_options', $this->_url.'/admin/options.css', array(), self::version, 'all');
 
+    // special case - posts
+    if ($hook == 'edit.php' || $hook == 'post-new.php')
+    {
+      if (isset($_GET['post_type']) && $_GET['post_type'])
+        $hook.= '?post_type='.$_GET['post_type'];
+    }
+    else
+    if ($hook == 'post.php')
+    {
+      global $post;
+      if ($post && isset($post->post_type))
+        $hook.= '?post_type='.$post->post_type;
+    }
+    else
+    if ($hook == 'edit-tags.php')
+    {
+      if (isset($_GET['taxonomy']) && $_GET['taxonomy'])
+        $hook = add_query_arg(array('taxonomy' => $_GET['taxonomy']), $hook);
+
+      if (isset($_GET['post_type']) && $_GET['post_type'])
+        $hook = add_query_arg(array('post_type' => $_GET['post_type']), $hook);
+    }
+
 
     $enabled_pages = get_option(__class__.'_enabled_pages', array());
     if (!is_array($enabled_pages)) $enabled_pages = array();
 
-    if (isset($enabled_pages[$hook]))
+    if (in_array($hook, $enabled_pages))
     {
-      if (in_array($hook, $this->supported_pages))
-        $part = $hook.'.js';
+      if (isset($this->supported_pages[$hook]))
+        $part = $this->supported_pages[$hook];
       else
         $part = 'global.js';
 

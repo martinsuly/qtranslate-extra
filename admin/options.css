@@ -14,3 +14,7 @@
   margin-top: 4px;
   margin-left: 13px;
 }
+
+.qte-pages .plugin-count {
+  display: none;
+}
